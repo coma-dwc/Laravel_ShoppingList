@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 class ShoppingListController extends Controller
 {
   /**
-   * トップページを表示する
+   * 買うものページを表示する
    *
    * @return \Illiminate\View\View
    */
@@ -67,8 +67,11 @@ class ShoppingListController extends Controller
      public function delete(Request $request, $shopping_list_id)
      {
        //shopping_list_idのレコード取得
-       $shopping_list = $this->getShopping_listModel($shopping_list_id);
-       //タスクを削除する
+       $shopping_list = Shopping_listModel::find($shopping_list_id);
+       //↑もともとの記述
+       /*$shopping_list = $this->getShopping_listModel($shopping_list_id); */
+
+       //買うものを削除する
        if ($shopping_list !== null) {
          $shopping_list->delete();
          $request->session()->flash('front.shoppinglist_delete_success', true);
@@ -77,48 +80,51 @@ class ShoppingListController extends Controller
        return redirect('/shopping_list/list');
      }
 
-     /**
-      * 買うものの完了
-      */
-      public function complete(Request $request, $shopping_list_id)
-      {
-        /* 買うものを完了テーブルに移動 */
+ /**
+     * 買うものの完了
+     */
+    public function complete(Request $request, $shopping_list_id)
+    {
+        /* タスクを完了テーブルに移動させる */
         try {
-          DB::beginTransaction(); //トランザクション開始
+            // トランザクション開始
+            DB::beginTransaction();
 
-          //shopping_list_idのレコード取得
-          $shopping_list = $this->getShopping_listModel($shopping_list_id);
-          if ($shopping_list === null) {
-            throw new \Exception(''); //不正によるトランザクション終了
-          }
-
-          //shopping_lists側を削除
-          $shopping_list->delete();
+            // Shopping_list_idのレコードを取得する
+            /*$shopping_list = $this->getShopping_listModel($shopping_list_id); */
+            $shopping_list = Shopping_listModel::find($shopping_list_id);
+            if ($shopping_list === null) {
+                // $shopping_list_idが不正なのでトランザクション終了
+                throw new \Exception('');
+            }
 //var_dump($shopping_list->toArray()); exit;
+            // shopping_list側を削除する
+            $shopping_list->delete();
 
-          //completed_shopping_lists側にINSERT
-          $dask_datum = $shopping_list->toArray();
-          unset($dask_datum['created_at']);
-          $r = Completed_Shopping_listModel::create($dask_datum);
-          if ($r === null) {
-            //insertで失敗したのでトランザクション終了
-            throw new \Exception('');
-          }
+            // completed_shopping_list側にinsertする
+            $dask_datum = $shopping_list->toArray();
+            unset($dask_datum['created_at']);
+            unset($dask_datum['updated_at']);
+            $r = Completed_Shopping_listModel::create($dask_datum);
+            if ($r === null) {
+                // insertで失敗したのでトランザクション終了
+                throw new \Exception('');
+            }
+//echo '処理成功'; exit;
 
-          //トランザクション終了
-          DB::commit();
-
-          //完了メッセージ
-          $request->session()->flash('front.shoppinglist_completed_success', true);
+            // トランザクション終了
+            DB::commit();
+            // 完了メッセージ出力
+            $request->session()->flash('front.shoppinglist_completed_success', true);
         } catch(\Throwable $e) {
-//var_dump($e->getMessage()); exit;
-          //トランザクション異常終了
-          DB::rollback();
-          //失敗メッセージ
-          $request->session()->flash('front.shoppinglist_completed_failure', true);
+var_dump($e->getMessage()); exit;
+            // トランザクション異常終了
+            DB::rollBack();
+            // 完了失敗メッセージ出力
+            $request->session()->flash('front.shoppinglist_completed_failure', true);
         }
 
-        //一覧に遷移
+        // 一覧に遷移する
         return redirect('/shopping_list/list');
-      }
+    }
 }
